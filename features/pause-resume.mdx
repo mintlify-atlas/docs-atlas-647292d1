@@ -1,0 +1,74 @@
+---
+title: "Pause and Resume"
+description: "Reliably pause and resume downloads with zero zombie processes"
+---
+
+OSGUI implements a stream-interception architecture to pause downloads cleanly, solving a common problem with process-based download managers.
+
+## The problem with standard pause implementations
+
+When a GUI calls `kill(pid)` on a yt-dlp process, the operating system terminates only the parent process. Child workers spawned by yt-dlp — typically `ffmpeg` for stream merging — keep running in the background. These orphaned processes continue writing to disk and consuming memory until they finish or the machine reboots. Standard OS-level signals are not reliable enough to clean up the entire process tree across Windows, macOS, and Linux.
+
+## OSGUI's solution: stream-interception architecture
+
+Instead of targeting a process ID from outside, OSGUI triggers termination from within the active stream handler. The sequence works as follows:
+
+1. Every `yt-dlp` download runs with a `stdout` data listener attached.
+2. Each time yt-dlp emits a chunk of output, the data handler checks whether `videoToPause` (from `UserInputVideoStore`) matches the current download's `uniqueId`.
+3. If the IDs match, the handler sets `isPaused = true`, updates the `DownloadList` row in SQLite to `isPaused = true` and `tracking_message = "Paused by user"`, then calls `childDataProcess.kill()`.
+4. Because the kill is issued from inside the closure that owns `childDataProcess`, the process terminates itself cleanly — no external PID lookup required.
+
+<Note>
+  This inversion of control means the child process effectively self-terminates on the next chunk of output after a pause is requested. The result is 100% reliable cleanup with zero zombie processes, independent of the operating system.
+</Note>
+
+## Pausing a download
+
+<Steps>
+  <Step title="Locate the active download">
+    Find the download you want to pause in the download list. Active downloads show a real-time progress message in the status column.
+  </Step>
+  <Step title="Click Pause">
+    Click the **Pause** button on that row. This sets `videoToPause` in `UserInputVideoStore` to the download's `uniqueId`.
+  </Step>
+  <Step title="Stream handler detects the pause request">
+    On the next stdout chunk from yt-dlp, the data handler sees that `videoToPause === uniqueId`. It immediately:
+
+    - Sets `isPaused = true` in the closure scope.
+    - Executes the following SQL update:
+
+      ```sql
+      UPDATE DownloadList
+      SET active = false,
+          isPaused = true,
+          completed = false,
+          tracking_message = "Paused by user"
+      WHERE unique_id = $1
+      ```
+
+    - Calls `childDataProcess.kill()` to terminate the yt-dlp process.
+  </Step>
+  <Step title="Download list reflects the paused state">
+    The row in the download list updates to show `isPaused = true`. The status column displays `Download paused by user` once the `close` event fires.
+  </Step>
+</Steps>
+
+## Resuming a download
+
+<Warning>
+  yt-dlp does not natively resume partial downloads unless you configure it with `--continue` and the server supports byte-range requests. In OSGUI, resuming a paused download re-submits the original URL and format string, which restarts the download from the beginning. Any partially downloaded data from the previous attempt is overwritten.
+</Warning>
+
+To restart a paused download, click the restart icon (circular power button) on the paused entry in the download list. OSGUI calls `downloadHandler` with the same `format_id` and `web_url`. Before inserting the new row, it deletes any existing `DownloadList` row for the same `format_id` and `web_url` pair, so there are no duplicate rows.
+
+## Download states in SQLite
+
+The `DownloadList` table tracks every state transition via boolean columns. The pause flow touches these columns in order:
+
+| Event | `active` | `isPaused` | `completed` | `failed` |
+|---|---|---|---|---|
+| Download started | `true` | `false` | `false` | `false` |
+| Pause requested (mid-stream) | `false` | `true` | `false` | `false` |
+| Process closed after pause | `false` | `true` | `false` | `false` |
+| Download completed normally | `false` | `false` | `true` | `false` |
+| Error occurred | `false` | `false` | `false` | `true` |

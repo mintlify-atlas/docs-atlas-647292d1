@@ -1,0 +1,127 @@
+---
+title: "Database"
+description: "How OSGUI uses SQLite to persist download history"
+---
+
+OSGUI uses a local SQLite database (`osgui.db`) via `@tauri-apps/plugin-sql` to persist download history across sessions. All reads and writes go through `DatabaseStore` and `DownloadStore` — never directly from React components.
+
+<Note>
+The database is entirely local. No download history, file paths, or URLs are ever sent to a remote server. The only outbound data is an anonymous, opt-in telemetry row inserted into Supabase on first launch (see `DatabaseStore.supabaseQueryInsert`), which contains only platform metadata (OS, arch, app version).
+</Note>
+
+## DownloadList Table
+
+The single table in `osgui.db` is `DownloadList`. It is created automatically on first launch by `DatabaseStore.createOrLoadDatabase()`.
+
+```sql
+CREATE TABLE IF NOT EXISTS DownloadList (
+  id VARCHAR(255) PRIMARY KEY,
+  unique_id VARCHAR(255) NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT false,
+  failed BOOLEAN NOT NULL DEFAULT false,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  isPaused BOOLEAN NOT NULL DEFAULT false,
+  format_id VARCHAR(255) NOT NULL,
+  web_url VARCHAR(255),
+  title VARCHAR(255),
+  tracking_message TEXT,
+  playlistVerification TEXT,
+  playlistTitle TEXT
+);
+```
+
+### Column Reference
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | `VARCHAR(255) PRIMARY KEY` | `timestamp_ms + nanoid(25)` — sortable, unique, and collision-resistant. Used in `ORDER BY id DESC` to show newest downloads first. |
+| `unique_id` | `VARCHAR(255) NOT NULL` | `nanoid(20)` — the stable handle used throughout the download's lifetime to identify its process for pause/resume. |
+| `active` | `BOOLEAN` | `true` while the yt-dlp process is running and emitting stdout. |
+| `failed` | `BOOLEAN` | `true` if stderr received data or the process exited with an error. |
+| `completed` | `BOOLEAN` | `true` when the process closes without error and without a pause request. |
+| `isPaused` | `BOOLEAN` | `true` when the user clicked pause and the stream-interception kill was triggered. |
+| `format_id` | `VARCHAR(255) NOT NULL` | The yt-dlp format string passed to `-f`, e.g., `137+140` or `bestvideo+bestaudio`. |
+| `web_url` | `VARCHAR(255)` | The original URL submitted by the user. |
+| `title` | `VARCHAR(255)` | The video title, used for display in the UI. |
+| `tracking_message` | `TEXT` | The most recent stdout line from yt-dlp. Updated on every chunk; shows live download progress (e.g., `[download]  47.3% of 128.00MiB`). |
+| `playlistVerification` | `TEXT` | A fixed UUID string injected for playlist downloads. Lets the UI distinguish playlist items from single-video items. |
+| `playlistTitle` | `TEXT` | The playlist name, used to construct the output path subfolder: `~/Downloads/OSGUI/<playlistTitle>/`. |
+
+## Lifecycle Operations
+
+### Startup
+
+`App.tsx` calls `DatabaseStore.createOrLoadDatabase()` on mount:
+
+1. Opens `sqlite:osgui.db` (creates it if it does not exist).
+2. Runs `CREATE TABLE IF NOT EXISTS DownloadList (...)`.
+3. Runs `SELECT * FROM DownloadList` and calls `UserInputVideoStore.setDownloadsArr()` to hydrate the UI with history from the previous session.
+
+### Download Start
+
+When `DownloadStore.downloadHandler()` is called:
+
+1. A `setInterval` is started (default every `1000ms`) to continuously poll `SELECT * FROM DownloadList ORDER BY id DESC` and push updates to Zustand.
+2. The process is spawned.
+3. Any existing row for the same `format_id + web_url` pair is deleted (`DELETE FROM DownloadList WHERE format_id = $1 AND web_url = $2`).
+4. A new row is `INSERT`ed with `active = true`, `completed = false`, `failed = false`, `isPaused = false`, and `tracking_message = 'Retrieving download info'`.
+
+### During Download
+
+On every stdout chunk, `dataHandler` runs:
+
+```sql
+UPDATE DownloadList
+SET failed = false,
+    isPaused = false,
+    active = true,
+    completed = false,
+    tracking_message = $1
+WHERE unique_id = $2
+```
+
+This keeps `tracking_message` current in real time so the UI always reflects the latest yt-dlp progress line.
+
+### On Completion, Pause, or Error
+
+When the process closes, the `on("close")` handler writes the terminal state:
+
+| Outcome | `active` | `completed` | `failed` | `isPaused` | `tracking_message` |
+|---|---|---|---|---|---|
+| Success | `false` | `true` | `false` | `false` | `"Download completed successfully!"` |
+| Paused | `false` | `false` | `false` | `true` | `"Download paused by user"` |
+| Error | `false` | `false` | `true` | `false` | `"Download failed"` |
+
+The `setInterval` poll is cleared in the `finally` block of the `on("close")` handler.
+
+### Clear All History
+
+<Tip>
+You can clear all download history from the OSGUI UI. This calls `DatabaseStore.emptyDatabase()`, which runs `DELETE FROM DownloadList` and resets `downloadsArr` to an empty array. The `osgui.db` file itself is not deleted — only the rows.
+</Tip>
+
+### Remove One Entry
+
+`DatabaseStore.singleFileRemove(uniqueId)` deletes a single row:
+
+```sql
+DELETE FROM DownloadList WHERE unique_id = $1
+```
+
+After deletion, `setDownloadsArr` is called with a fresh `SELECT * FROM DownloadList` to sync the UI.
+
+## Polling Pattern
+
+Rather than subscribing to a reactive stream, `DownloadStore` uses a `setInterval`-based polling pattern during active downloads:
+
+```ts
+intervalId = setInterval(async () => {
+  setDownloadsArr(
+    await db.select("SELECT * FROM DownloadList ORDER BY id DESC")
+  );
+}, timeInterval); // default: 1000ms
+```
+
+This decouples the high-frequency DB writes (one per stdout chunk) from the UI render cycle. The UI refreshes at a controlled rate, while the database absorbs the full stream throughput. The interval is cleared in the download's `on("close")` handler to prevent memory leaks.
+
+The polling interval is user-configurable via `DownloadStore.setDefaultTimeInterval()` and persisted to `localStorage` under the key `getTimeInterval`.

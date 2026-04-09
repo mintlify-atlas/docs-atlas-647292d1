@@ -1,0 +1,66 @@
+---
+title: "Downloading Videos"
+description: "How to download individual videos from YouTube, Facebook, X, and 1000+ supported sites"
+---
+
+OSGUI wraps `yt-dlp` in a desktop GUI, letting you download videos from YouTube, Facebook, X (Twitter), and over 1000 other sites without touching a terminal.
+
+<Warning>
+  `yt-dlp` and `ffmpeg` must be installed and available on your system `PATH` before using OSGUI. On Windows, the binary must be named exactly `yt-dlp.exe`. OSGUI will show a toast notification if the command cannot be found.
+</Warning>
+
+## Download workflow
+
+<Steps>
+  <Step title="Enter a URL">
+    Paste or type a video URL into the input field in the top section of the app. Use the clipboard paste button to read directly from your clipboard.
+  </Step>
+  <Step title="Search for video information">
+    Click **Search**. OSGUI runs `yt-dlp --dump-json <url>` in the background and parses the response into a list of available format streams.
+  </Step>
+  <Step title="Select a format">
+    Choose a video stream and an audio stream from the format selectors that appear. OSGUI combines them into a format string (e.g., `137+140`) that is passed to yt-dlp with the `-f` flag. See [Format Selection](/features/format-selection) for details.
+  </Step>
+  <Step title="Start the download">
+    Click **Download**. OSGUI spawns the following command:
+
+    ```bash
+    yt-dlp -f <formatString> -o ~/Downloads/OSGUI/%(title)s<formatString>.%(ext)s <url>
+    ```
+
+    The download entry appears immediately in the download list with the status `Retrieving download info`.
+  </Step>
+</Steps>
+
+## Output location
+
+<Note>
+  All downloaded files are saved to `~/Downloads/OSGUI/` using the yt-dlp output template `%(title)s<formatString>.%(ext)s`. The final filename is derived from the video title as reported by yt-dlp, followed by the format string and the file extension.
+</Note>
+
+## Real-time progress
+
+While a download is running, OSGUI streams every chunk of `yt-dlp` stdout output directly into the `tracking_message` column in the local SQLite database. The download list polls the database on a configurable interval (default: 1000 ms, stored in `localStorage` as `getTimeInterval`) and reflects each new progress line as it arrives.
+
+## Download states
+
+Each entry in the download list maps to a row in the `DownloadList` SQLite table. The state of a download is represented by a combination of boolean columns:
+
+| State | `active` | `completed` | `failed` | `isPaused` |
+|---|---|---|---|---|
+| Downloading | `true` | `false` | `false` | `false` |
+| Completed | `false` | `true` | `false` | `false` |
+| Failed | `false` | `false` | `true` | `false` |
+| Paused | `false` | `false` | `false` | `true` |
+
+The `tracking_message` column holds the last line of yt-dlp stdout output, or a fixed status string such as `Download completed successfully!`, `Paused by user`, or `Error occurred!`.
+
+## Removing downloads from history
+
+To remove a single entry from the download history, click the remove action on that row. This calls `singleFileRemove(uniqueId)` which executes `DELETE FROM DownloadList WHERE unique_id = $1` against the local database.
+
+To clear the entire download history at once, use the **Clear All** action, which runs `DELETE FROM DownloadList` and resets the in-memory list.
+
+## Supported sites
+
+OSGUI supports every site that `yt-dlp` supports — over 1000 in total, including YouTube, Facebook, X (Twitter), Vimeo, Twitch, and more. Keep `yt-dlp` up to date for the best site compatibility; new releases ship roughly every two weeks.

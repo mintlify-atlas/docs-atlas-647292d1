@@ -1,0 +1,118 @@
+---
+title: "Installation"
+description: "Download and install OSGUI on Windows, macOS, or Linux"
+---
+
+## System requirements
+
+OSGUI version **0.3.0** runs on Windows, macOS, and Linux. The application window has a minimum size of 700 × 500 pixels.
+
+| Platform | Minimum version |
+|---|---|
+| Windows | Windows 10 (x64) |
+| macOS | macOS 11 Big Sur |
+| Linux | Most major distributions (x64, ARM) |
+
+## Download OSGUI
+
+Get the latest release for your platform from the [GitHub releases page](https://github.com/Ahmedtrooper/osgui/releases). Each release includes installers for all three platforms.
+
+## Platform-specific installation
+
+<Tabs>
+  <Tab title="Windows">
+    <Steps>
+      <Step title="Download the installer">
+        From the releases page, download either the `.msi` (recommended) or the `.exe` installer for Windows.
+      </Step>
+      <Step title="Run the installer">
+        Double-click the downloaded file and follow the on-screen prompts to complete installation. You may see a Windows SmartScreen prompt — click **More info**, then **Run anyway**.
+      </Step>
+      <Step title="Launch OSGUI">
+        Open OSGUI from the Start menu or the desktop shortcut created by the installer.
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="macOS">
+    <Steps>
+      <Step title="Download the disk image">
+        From the releases page, download the `.dmg` file for macOS.
+      </Step>
+      <Step title="Open the disk image">
+        Double-click the `.dmg` file to mount it. A Finder window will appear showing the OSGUI app.
+      </Step>
+      <Step title="Move OSGUI to Applications">
+        Drag the OSGUI icon into the **Applications** folder shown in the Finder window.
+      </Step>
+      <Step title="Launch OSGUI">
+        Open OSGUI from the Applications folder or Spotlight. On first launch, macOS may ask you to confirm opening an app from the internet — click **Open**.
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Linux">
+    <Steps>
+      <Step title="Download the package">
+        From the releases page, download the format that matches your distribution:
+        - `.AppImage` — works on most distributions without installation
+        - `.deb` — for Debian, Ubuntu, and derivatives
+        - `.rpm` — for Fedora, RHEL, and derivatives
+      </Step>
+      <Step title="Install or run the package">
+        <Tabs>
+          <Tab title="AppImage">
+            Make the file executable and run it directly:
+
+            ```bash
+            chmod +x OSGUI_*.AppImage
+            ./OSGUI_*.AppImage
+            ```
+          </Tab>
+          <Tab title=".deb">
+            ```bash
+            sudo dpkg -i OSGUI_*.deb
+            ```
+          </Tab>
+          <Tab title=".rpm">
+            ```bash
+            sudo rpm -i OSGUI_*.rpm
+            ```
+          </Tab>
+        </Tabs>
+      </Step>
+      <Step title="Launch OSGUI">
+        Run OSGUI from your application launcher or by executing the binary directly.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Required dependencies
+
+OSGUI relies on `yt-dlp` and `ffmpeg` at runtime. These are **not** bundled with the application — you must install them separately before OSGUI can download anything.
+
+<Warning>
+  Both `yt-dlp` and `ffmpeg` (including `ffplay` and `ffprobe`) must be available on your system `PATH`. If they are not found, OSGUI will show an error toast and downloads will fail.
+</Warning>
+
+| Binary | Purpose |
+|---|---|
+| `yt-dlp` | Fetches video metadata and handles downloads |
+| `ffmpeg` | Merges video and audio streams, handles transcoding |
+| `ffplay` | Playback support (bundled with most ffmpeg builds) |
+| `ffprobe` | Media analysis (bundled with most ffmpeg builds) |
+
+For step-by-step dependency installation instructions for each platform, see [Dependencies](/configuration/dependencies).
+
+## Verify the installation
+
+After launching OSGUI:
+
+1. Check that the application opens without any error toasts related to missing binaries.
+2. The app version (**0.3.0**) is shown in the About section.
+3. The `yt-dlp` version detected at startup appears in the status area — this confirms OSGUI found the binary on your PATH.
+
+If you see a toast warning about a missing binary, refer to [Dependencies](/configuration/dependencies) to install what is missing.
+
+## Next steps
+
+Once OSGUI is running with all dependencies in place, follow the [quickstart](/quickstart) to download your first video.

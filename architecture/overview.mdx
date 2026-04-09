@@ -1,0 +1,72 @@
+---
+title: "Architecture Overview"
+description: "How OSGUI is structured: Tauri backend, React frontend, Zustand stores, and SQLite"
+---
+
+OSGUI is a cross-platform desktop application built on a strict three-layer architecture. No React component ever calls a Tauri API directly — all side effects are funneled through Zustand stores, keeping components pure and testable.
+
+## Three-Layer Architecture
+
+<CardGroup cols={2}>
+  <Card title="UI Layer" icon="browser">
+    Pure React functional components built with [HeroUI](https://www.heroui.com/). Components read from Zustand state and dispatch store actions. They contain no business logic, no direct Tauri calls, and no SQL.
+
+    Key components: `UserInputSection`, `DownloadSection`, `PlaylistSection`, `ThemeToggleButton`
+  </Card>
+  <Card title="Logic Layer" icon="code">
+    Seven Zustand stores, each owning a distinct domain: user input, downloads, database, playlists, application versioning, OS detection, and theming.
+
+    Stores are the only layer that calls Tauri plugins or spawns external processes.
+  </Card>
+  <Card title="Data Layer" icon="database">
+    The Rust/Tauri backend exposes plugin APIs consumed exclusively by the Logic Layer. Persistent state lives in a local SQLite database (`osgui.db`). Volatile state lives in Zustand.
+  </Card>
+  <Card title="Type Safety Layer" icon="shield-check">
+    All store-to-backend contracts are defined as TypeScript interfaces under `src/interfaces/`. Directories include `application/`, `database/`, `playlist/`, `theme/`, `video/`, and more — serving as living documentation between the frontend and Rust layer.
+  </Card>
+</CardGroup>
+
+## Tauri v2 Plugins
+
+The following Tauri plugins are used across stores:
+
+| Plugin | Purpose |
+|---|---|
+| `@tauri-apps/plugin-shell` | Spawns `yt-dlp` processes and streams stdout/stderr |
+| `@tauri-apps/plugin-sql` | SQLite read/write via `tauri-plugin-sql` |
+| `@tauri-apps/plugin-fs` | File system operations (read/write `video.json`, `playlist.json`) |
+| `@tauri-apps/plugin-os` | Runtime platform detection (linux, windows, macos, android, ios) |
+| `@tauri-apps/plugin-clipboard-manager` | Paste URLs from and copy URLs to clipboard |
+| `@tauri-apps/plugin-notification` | System-level toast notifications |
+| `@tauri-apps/plugin-opener` | Open downloaded files and external URLs |
+
+## Data Flow
+
+The full path from user action to rendered UI update:
+
+```
+User Input
+  → Zustand store action (e.g., fetchVideoInformation, downloadHandler)
+    → Tauri shell plugin (Command.create("ytDlp", [...]))
+      → yt-dlp binary (stdout stream)
+        → dataHandler callback (fires per chunk)
+          → SQLite UPDATE (tracking_message, active, completed flags)
+            → Zustand setDownloadsArr (re-read from DB)
+              → React UI re-render
+```
+
+## Stream Architecture for Downloads
+
+<Note>
+This architecture solves the "zombie process" problem that plagues naive pause/resume implementations. Rather than relying on OS-level `kill(pid)` — which often leaves ffmpeg child workers running — OSGUI intercepts the active stdout stream from within its own closure.
+
+When a pause request arrives, the `dataHandler` detects it on the next incoming chunk, updates the database, and calls `childDataProcess.kill()` from inside the event handler. This guarantees a clean, synchronous termination with zero memory leaks, regardless of operating system.
+</Note>
+
+The stream architecture works as follows:
+
+1. **Spawn**: `DownloadStore.downloadHandler()` calls `Command.create("ytDlp", [...]).spawn()` via `@tauri-apps/plugin-shell`.
+2. **Stream ingestion**: `coreDownloadCommand.stdout.on("data", dataHandler)` fires for every stdout chunk yt-dlp emits (100+ chunks/second during ffmpeg merging).
+3. **DB write per chunk**: Each `dataHandler` invocation runs an `UPDATE DownloadList SET tracking_message = $1 WHERE unique_id = $2` query.
+4. **Pause check**: At the end of every `dataHandler` call, the handler reads `useUserInputVideoStore.getState().videoToPause`. If it matches the current `uniqueId`, the process kills itself.
+5. **Close event**: The `on("close")` handler fires after the process exits, sets the terminal state (`completed`, `failed`, or `isPaused`), and clears the polling `setInterval`.

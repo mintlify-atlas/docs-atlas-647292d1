@@ -1,0 +1,63 @@
+---
+title: "Format Selection"
+description: "Choose specific video and audio streams before downloading"
+---
+
+After searching for a video, OSGUI displays every available format stream reported by yt-dlp. You can combine a video stream and an audio stream into a single download, or download one stream alone.
+
+## How format data is fetched
+
+When you click **Search** in single-video mode, OSGUI runs:
+
+```bash
+yt-dlp --dump-json <url>
+```
+
+The JSON response contains a `formats` array listing every stream the site exposes — including resolution, codec, bitrate, file size, and whether the stream contains video, audio, or both.
+
+## Selecting streams
+
+OSGUI displays two side-by-side columns of format cards: one for video-only streams and one for audio-only streams. Each card shows the resolution, format ID, extension, and codec type. Click **Select** on a card to pick that stream.
+
+- **Video stream card** — clicking **Select** calls `videoStreamSelect()`, which sets `selectedVideoStream` in `DownloadStore`.
+- **Audio stream card** — clicking **Select** calls `audioStreamSelect()`, which sets `selectedAudioStream` in `DownloadStore`.
+
+When you pick a stream, the store computes the combined `selectedFormat` string immediately:
+
+| Selection | `selectedFormat` value |
+|---|---|
+| Video only | `<videoStreamId>` |
+| Audio only | `<audioStreamId>` |
+| Video + Audio | `<videoStreamId>+<audioStreamId>` |
+
+<Note>
+  The `video+audio` format string is a standard yt-dlp syntax. For example, `137+140` tells yt-dlp to download stream `137` (1080p H.264 video, no audio) and stream `140` (AAC audio, no video) and merge them via ffmpeg into a single output file. ffmpeg must be installed for merging to work.
+</Note>
+
+## How the format string is used
+
+The computed `selectedFormat` value is passed to the download command as the `-f` argument:
+
+```bash
+yt-dlp -f 137+140 -o ~/Downloads/OSGUI/%(title)s137+140.%(ext)s <url>
+```
+
+The format string also appears in the output filename so that multiple quality variants of the same video do not overwrite each other.
+
+## Direct URL download
+
+If you skip format selection and download via a direct file URL, OSGUI omits the `-f` flag entirely and lets yt-dlp choose the default format:
+
+```bash
+yt-dlp -o ~/Downloads/OSGUI/%(title)s<formatString>.%(ext)s <url>
+```
+
+This path is triggered when `directURL: true` is passed to `downloadHandler`.
+
+## Showing non-media formats
+
+By default, OSGUI hides format entries that do not contain media content. Toggle **Show non-media formats** to set `showNonMedia: true` in `UserInputVideoStore`, which makes all format rows visible including manifests, subtitle tracks, and other non-playable streams.
+
+<Tip>
+  For the highest quality result, select the highest-resolution video-only stream alongside an audio-only stream and let ffmpeg merge them. Each format card shows the resolution, codec, and extension to help you compare options at the same resolution.
+</Tip>

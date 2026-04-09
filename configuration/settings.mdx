@@ -1,0 +1,91 @@
+---
+title: "Settings"
+description: "Configurable options in OSGUI: download interval, format preferences, and more"
+---
+
+OSGUI exposes a small set of runtime settings that control how frequently the UI refreshes during downloads, where files are saved, and how version checking behaves on startup.
+
+## Download polling interval
+
+During an active download, OSGUI polls the SQLite database on a fixed interval to refresh the download list in the UI.
+
+| Property | Value |
+|----------|-------|
+| Setting key in localStorage | `getTimeInterval` |
+| Default | `1000` ms (1 second) |
+| Controlled by | `defaultTimeInterval` in `DownloadStore` |
+
+The interval is read from `localStorage.getItem("getTimeInterval")` when the store is initialized. If no value is stored, it defaults to `1000`.
+
+<Note>
+This setting persists across app restarts via `localStorage`. Changes made programmatically via `setDefaultTimeInterval()` are written back to `localStorage` immediately so the value survives a reload.
+</Note>
+
+**Choosing an interval:**
+
+- **Lower values** (e.g., `500` ms) — the download list refreshes more frequently, giving more responsive progress updates. This also means more SQLite reads per second.
+- **Higher values** (e.g., `2000` ms or more) — fewer database queries per second, which can reduce CPU overhead on slower machines at the cost of less frequent UI updates.
+
+The interval controls a `setInterval` loop that runs `SELECT * FROM DownloadList ORDER BY id DESC` against the local SQLite database (`osgui.db`) for as long as a download is active. The interval is cleared automatically when the download closes (completes, fails, or is paused).
+
+## Version checking on startup
+
+OSGUI performs two version checks each time the application starts, both orchestrated by `fetchAppVersion()` in `ApplicationStore`:
+
+<Steps>
+  <Step title="Fetch the local app version">
+    OSGUI calls `getVersion()` from `@tauri-apps/api/app` to read the version compiled into the Tauri bundle. The current bundle version is `0.3.0`.
+  </Step>
+  <Step title="Fetch online metadata">
+    A `GET` request is made to the metadata endpoint:
+
+    ```
+    https://raw.githubusercontent.com/AhmedTrooper/OSGUI/main/update/metadata.json
+    ```
+
+    The response is parsed as `MetadataInterface`, which contains `onlineApplicationVersion` and `onlineYtDlpVersion`.
+  </Step>
+  <Step title="Compare versions and show a toast if outdated">
+    If the local application version is less than `onlineApplicationVersion`, a warning toast is shown:
+
+    > **Application Update Available** — Online: `x.y.z`, Local: `x.y.z`
+
+    If the check fails entirely (e.g., no network), a danger toast is shown and `errorOccurredWhileApplicationUpdateCheck` is set to `true`.
+  </Step>
+  <Step title="Check yt-dlp version">
+    `fetchYtdlpVersion()` is called automatically after the app version check. It runs `yt-dlp --version` via a Tauri shell command and compares the output against `onlineYtDlpVersion` from the same metadata response. If your local `yt-dlp` is behind, a warning toast is displayed:
+
+    > **Yt-dlp update available** — Online: `x.y.z`, Local: `x.y.z`
+  </Step>
+</Steps>
+
+## Output directory
+
+Downloaded files are always saved to a fixed path derived from the OS downloads directory:
+
+<Info>
+All downloads go to `~/Downloads/OSGUI/` on macOS and Linux, or the equivalent `Downloads\OSGUI\` folder on Windows. This path is resolved at runtime using `downloadDir()` from `@tauri-apps/api/path` and is not currently configurable through the UI.
+</Info>
+
+The output template passed to `yt-dlp` is:
+
+```
+<downloadsDir>/OSGUI/%(title)s<formatString>.%(ext)s
+```
+
+### Playlist output
+
+When downloading a playlist, `yt-dlp` handles directory creation automatically based on the playlist title. Playlist items are placed under:
+
+```
+<downloadsDir>/OSGUI/<playlistTitle>/
+```
+
+## Format selection
+
+OSGUI allows selecting separate video and audio streams before starting a download. The selected streams are combined into a format string passed to `yt-dlp` with the `-f` flag:
+
+- Selecting a video stream only: `-f <videoStream>`
+- Selecting both video and audio streams: `-f <videoStream>+<audioStream>`
+
+Format state is managed in `DownloadStore` via `selectedVideoStream`, `selectedAudioStream`, and `selectedFormat`.

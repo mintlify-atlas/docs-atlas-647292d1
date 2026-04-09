@@ -1,80 +1,79 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Download your first video with OSGUI in under two minutes"
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+Before you start, make sure you have:
 
-### Step 1: Set up your local environment
+- OSGUI installed — see the [installation guide](/installation) if you haven't done this yet
+- `yt-dlp` available on your system `PATH`
+- `ffmpeg` (including `ffplay` and `ffprobe`) available on your system `PATH`
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Download your first video
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Launch OSGUI">
+    Open OSGUI from your application launcher, Start menu, or Applications folder. The app performs a startup check for `yt-dlp` and `ffmpeg`. If either binary is missing, you will see a warning toast — resolve that first by following [Dependencies](/configuration/dependencies).
+  </Step>
+  <Step title="Paste a video URL">
+    Click the URL input field at the top of the main view and paste the link to the video you want to download. You can type the URL manually or use the clipboard paste button next to the field to paste from your clipboard automatically.
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <Tip>
+      OSGUI supports YouTube, Facebook, X (Twitter), and 1,000+ other sites. Any URL that `yt-dlp` supports will work here.
+    </Tip>
+  </Step>
+  <Step title="Click Search">
+    Click the **Search** button. OSGUI runs `yt-dlp --dump-json` against the URL to fetch video metadata — title, available formats, and stream information — without starting a download. This usually completes in a few seconds.
+  </Step>
+  <Step title="Select a format">
+    Once metadata loads, two dropdowns appear: one for the **video stream** and one for the **audio stream**. Select your preferred quality from each dropdown.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    - Selecting only a video stream downloads that stream alone.
+    - Selecting both a video stream and an audio stream combines them into a single file using `ffmpeg` (format string: `videoId+audioId`).
+    - If you skip format selection, OSGUI downloads the best available format automatically.
+  </Step>
+  <Step title="Click Download">
+    Click the **Download** button. OSGUI adds the item to the download list and invokes `yt-dlp` with your selected format:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash
+    yt-dlp -f <formatString> -o "<Downloads>/OSGUI/%(title)s<formatString>.%(ext)s" <videoUrl>
+    ```
 
-### Step 3: Go live
+    The download list updates in real time, showing the live status message from `yt-dlp`'s output as the file is fetched and processed.
+  </Step>
+  <Step title="Find your file">
+    When the download completes, the status changes to **Download completed successfully!**. Your file is saved to:
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    <Note>
+      Files are saved to `~/Downloads/OSGUI/` on all platforms. The file name follows the pattern `<video title><formatString>.<ext>`.
+    </Note>
 
-## Next steps
+    Open your file manager and navigate to the `OSGUI` folder inside your Downloads directory to find the file.
+  </Step>
+</Steps>
 
-Now that you have your docs running, explore these key features:
+## Tips
 
-<CardGroup cols={2}>
+**Pausing a download**
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+Click the **Pause** button next to an active download in the download list. OSGUI uses a stream-interception architecture to stop the `yt-dlp` process cleanly — no zombie processes are left running in the background. The download entry stays in the list with a **Paused by user** status.
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+To restart a paused download, click the restart icon on that entry. OSGUI will re-submit the same URL and format, starting the download fresh from the beginning.
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+<Tip>
+  Restarting a paused download begins from scratch. For large files, consider letting the download run to completion rather than pausing midway.
+</Tip>
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+**Checking your yt-dlp version**
 
-</CardGroup>
+OSGUI checks your local `yt-dlp` version at startup and compares it against the latest release. If an update is available, a warning toast appears with both the installed version and the current online version. Keep `yt-dlp` up to date for the best site compatibility — new releases ship roughly every two weeks.
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+```bash
+# Update yt-dlp via pip
+python -m pip install -U yt-dlp
+
+# Or download the latest standalone binary from:
+# https://github.com/yt-dlp/yt-dlp/releases
+```

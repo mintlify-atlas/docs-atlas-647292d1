@@ -1,0 +1,152 @@
+---
+title: "Dependencies"
+description: "Required external tools: yt-dlp, ffmpeg, ffplay, and ffprobe"
+---
+
+OSGUI is a GUI wrapper around `yt-dlp`. It does not bundle any download tooling itself — you must install and maintain the required external binaries separately.
+
+## Required tools
+
+All four tools must be installed and accessible on your system `PATH`:
+
+| Tool | Purpose |
+|------|---------|
+| `yt-dlp` | Core downloader — fetches video and audio streams |
+| `ffmpeg` | Merging, transcoding, and audio extraction |
+| `ffplay` | Media playback (part of the ffmpeg suite) |
+| `ffprobe` | Stream inspection (part of the ffmpeg suite) |
+
+<Warning>
+`yt-dlp` must be named **exactly** `yt-dlp` (or `yt-dlp.exe` on Windows). Alternate binary names such as `ytdlp`, `ytdlpx64`, or any other variant are **not** supported. OSGUI invokes `yt-dlp --version` at startup — if the binary is not found by that exact name, the version check will fail and downloads will not work.
+</Warning>
+
+## Installing yt-dlp
+
+<Tabs>
+  <Tab title="Windows">
+    <Steps>
+      <Step title="Download the standalone binary">
+        Go to [github.com/yt-dlp/yt-dlp/releases](https://github.com/yt-dlp/yt-dlp/releases) and download `yt-dlp.exe`.
+      </Step>
+      <Step title="Place the binary on your PATH">
+        Move `yt-dlp.exe` to a directory that is on your system `PATH`, such as `C:\Windows\System32` or a custom `bin` folder you have added to `PATH`.
+      </Step>
+      <Step title="Verify the install">
+        Open a new Command Prompt or PowerShell window and run:
+        ```bash
+        yt-dlp --version
+        ```
+      </Step>
+    </Steps>
+
+    Alternatively, install via pip if you have Python:
+
+    ```bash
+    python -m pip install -U yt-dlp
+    ```
+  </Tab>
+  <Tab title="macOS">
+    <Steps>
+      <Step title="Install via pip or Homebrew">
+        <CodeGroup>
+
+        ```bash pip
+        python3 -m pip install -U yt-dlp
+        ```
+
+        ```bash Homebrew
+        brew install yt-dlp
+        ```
+
+        </CodeGroup>
+      </Step>
+      <Step title="Verify the install">
+        ```bash
+        yt-dlp --version
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Linux">
+    <Steps>
+      <Step title="Install via pip or your package manager">
+        <CodeGroup>
+
+        ```bash pip
+        python3 -m pip install -U yt-dlp
+        ```
+
+        ```bash apt (Debian/Ubuntu)
+        sudo apt install yt-dlp
+        ```
+
+        </CodeGroup>
+
+        Or download the standalone binary directly from [github.com/yt-dlp/yt-dlp/releases](https://github.com/yt-dlp/yt-dlp/releases) and place it somewhere on your `PATH`.
+      </Step>
+      <Step title="Make the binary executable (if using standalone)">
+        ```bash
+        chmod +x yt-dlp
+        sudo mv yt-dlp /usr/local/bin/
+        ```
+      </Step>
+      <Step title="Verify the install">
+        ```bash
+        yt-dlp --version
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Installing ffmpeg
+
+`ffmpeg`, `ffplay`, and `ffprobe` are distributed together as part of the ffmpeg project. Install them from [ffmpeg.org](https://ffmpeg.org/) or via your platform's package manager:
+
+<Tabs>
+  <Tab title="Windows">
+    Download a pre-built Windows binary from [ffmpeg.org/download.html](https://ffmpeg.org/download.html) and add the `bin/` folder to your system `PATH`.
+  </Tab>
+  <Tab title="macOS">
+    ```bash
+    brew install ffmpeg
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```bash
+    sudo apt install ffmpeg
+    ```
+    On other distributions, use the equivalent package manager command or build from source at [ffmpeg.org](https://ffmpeg.org/).
+  </Tab>
+</Tabs>
+
+## Verifying all tools
+
+After installation, open a terminal and confirm each tool is reachable:
+
+```bash
+yt-dlp --version
+ffmpeg -version
+ffplay -version
+ffprobe -version
+```
+
+Each command should print version information. If any command is not found, the binary is either not installed or not on your `PATH`.
+
+## Keeping yt-dlp up to date
+
+`yt-dlp` releases new versions approximately every two weeks. Websites change their formats and APIs frequently — running an outdated version of `yt-dlp` is the most common cause of download failures.
+
+OSGUI checks your installed `yt-dlp` version on startup (via `fetchYtdlpVersion()`) and compares it against the latest version listed in the online metadata. If your version is behind, a warning toast is displayed in the UI.
+
+<CodeGroup>
+
+```bash pip (recommended)
+python -m pip install -U yt-dlp
+```
+
+```bash yt-dlp self-update
+yt-dlp -U
+```
+
+</CodeGroup>

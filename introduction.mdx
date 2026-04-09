@@ -1,0 +1,58 @@
+---
+title: "Introduction"
+description: "What OSGUI is, who it's for, and how it works"
+---
+
+OSGUI is a lightweight, cross-platform desktop application that puts a native GUI on top of `yt-dlp`. Instead of typing commands in a terminal, you paste a URL, pick your format, and click Download — OSGUI handles the rest.
+
+## Who it's for
+
+OSGUI is built for people who want the full power of `yt-dlp` without memorizing flags or managing shell scripts. If you download videos regularly and prefer a graphical interface over the command line, OSGUI is for you.
+
+## Supported sites
+
+OSGUI supports every site that `yt-dlp` supports — that includes YouTube, Facebook, X (Twitter), and more than 1,000 other platforms. If `yt-dlp` can download it, OSGUI can too.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Format selection" icon="sliders" href="/features/format-selection">
+    Choose exact video and audio streams before downloading. Combine a video stream with a separate audio stream for the best quality.
+  </Card>
+  <Card title="Playlist downloads" icon="list" href="/features/playlist-downloads">
+    Fetch an entire playlist and download all items or select individual videos from the list.
+  </Card>
+  <Card title="Pause and resume" icon="circle-pause" href="/features/pause-resume">
+    Pause any active download and resume it later. A custom stream-interception architecture ensures clean process termination with no zombie processes.
+  </Card>
+  <Card title="Real-time progress" icon="chart-line" href="/features/downloading-videos">
+    Each download shows live status messages sourced directly from `yt-dlp`'s stdout stream.
+  </Card>
+</CardGroup>
+
+## Architecture
+
+OSGUI is built on three layers that stay strictly separated:
+
+- **UI layer** — React functional components styled with [HeroUI](https://www.heroui.com/). The window is rendered via Tauri's WebView.
+- **Logic layer** — [Zustand](https://github.com/pmndrs/zustand) stores divided by domain (`ApplicationStore`, `DownloadStore`, `UserInputVideoStore`). High-frequency I/O updates from `yt-dlp` are decoupled from the React render cycle to keep the UI smooth.
+- **Data layer** — A local SQLite database (via `tauri-plugin-sql`) persists download history across sessions. The Rust backend invokes `yt-dlp` and `ffmpeg` as sidecar processes via Tauri's shell plugin.
+
+<Note>
+  OSGUI does not bundle `yt-dlp` or `ffmpeg`. You must install them separately and make sure they are available on your system `PATH`. The app shows a warning toast on startup if either binary is missing or outdated.
+</Note>
+
+## Requirements overview
+
+| Dependency | Required | Notes |
+|---|---|---|
+| `yt-dlp` | Yes | Must be named `yt-dlp` (or `yt-dlp.exe` on Windows) on PATH |
+| `ffmpeg` | Yes | Required for merging and transcoding |
+| `ffplay` | Yes | Bundled with most ffmpeg distributions |
+| `ffprobe` | Yes | Bundled with most ffmpeg distributions |
+
+For platform-specific installation instructions, see [Dependencies](/configuration/dependencies).
+
+## Next steps
+
+Follow the [installation guide](/installation) to get OSGUI running, then go through the [quickstart](/quickstart) to download your first video.

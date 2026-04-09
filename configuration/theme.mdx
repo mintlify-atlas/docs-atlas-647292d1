@@ -1,0 +1,46 @@
+---
+title: "Theme"
+description: "Switch between dark and light mode in OSGUI"
+---
+
+OSGUI supports two themes: **dark** and **light**. The active theme is persisted across sessions and restored automatically on startup.
+
+## Changing the theme
+
+Click the theme toggle button in the top bar of the application window. Each click switches between dark and light mode. The new preference is saved immediately — no restart is needed.
+
+## How theme persistence works
+
+Theme state is managed by `useThemeStore` (Zustand) and backed by `localStorage`:
+
+| Property | Value |
+|----------|-------|
+| `localStorage` key | `"theme"` |
+| Possible values | `"dark"` \| `"light"` |
+| Default (no saved preference) | `"dark"` |
+
+On startup, `setThemeData()` reads the `"theme"` key from `localStorage`:
+
+- If the saved value is `"dark"`, `dark` is set to `true` and `localStorage` is written with `"dark"`.
+- If the saved value is `"light"`, `dark` is set to `false` and `localStorage` is written with `"light"`.
+- If no value is saved (first launch), `localStorage` is initialized to `"dark"` and dark mode is used.
+
+<Tip>
+Dark mode is the default. If you have never changed the theme, OSGUI will always open in dark mode without any additional configuration.
+</Tip>
+
+<Note>
+The theme preference is stored in the browser's `localStorage` inside the Tauri WebView. Clearing application data or resetting the WebView storage will revert the theme to the default dark mode.
+</Note>
+
+## Theme state reference
+
+The theme store exposes the following state and actions:
+
+| Name | Type | Description |
+|------|------|-------------|
+| `dark` | `boolean` | `true` when dark mode is active, `false` for light mode |
+| `savedTheme` | `"dark" \| "light" \| null` | The value read from `localStorage` at store initialization |
+| `setDark(value)` | `(boolean) => void` | Directly set the dark mode flag |
+| `toggleDark()` | `() => void` | Toggle between dark and light mode |
+| `setThemeData()` | `() => void` | Read the saved theme from `localStorage` and apply it |

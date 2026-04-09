@@ -1,0 +1,114 @@
+---
+title: "Common Issues"
+description: "Solutions for the most frequent problems with OSGUI"
+---
+
+<AccordionGroup>
+  <Accordion title='"Make sure yt-dlp is installed and added to PATH"'>
+    **Cause:** OSGUI could not find the `yt-dlp` binary when attempting to start a download. This happens when yt-dlp is not installed or its location is not included in your system `PATH`.
+
+    **Fix:**
+
+    1. Install yt-dlp using pip or download a standalone binary:
+       ```bash
+       python -m pip install -U yt-dlp
+       ```
+    2. Verify the installation is discoverable:
+       ```bash
+       yt-dlp --version
+       ```
+    3. On Windows, the binary must be named exactly `yt-dlp.exe`. Names like `ytdlp.exe`, `ytdlpx64.exe`, or any other variant will not be found by OSGUI.
+    4. If the command is not found, add the directory containing `yt-dlp` to your system `PATH` and restart OSGUI.
+  </Accordion>
+
+  <Accordion title='"Yt-dlp check failed" toast on startup'>
+    **Cause:** OSGUI runs `yt-dlp --version` at startup to confirm the binary is available. This toast appears when that check fails, meaning yt-dlp is either not installed or not on the system `PATH` at the time the app launches.
+
+    **Fix:**
+
+    1. Install yt-dlp if you have not already:
+       ```bash
+       python -m pip install -U yt-dlp
+       ```
+    2. Confirm it is accessible from the terminal:
+       ```bash
+       yt-dlp --version
+       ```
+    3. Restart OSGUI after installation. The version check runs once on startup; an already-running instance will not detect newly installed binaries.
+  </Accordion>
+
+  <Accordion title='"Error occurred on Data Fetch" when searching'>
+    **Cause:** yt-dlp wrote to stderr while fetching video metadata. Common reasons include:
+
+    - The URL is malformed or points to a non-existent resource
+    - The video is private or age-restricted
+    - The content is geo-restricted in your region
+    - Your installed version of yt-dlp is outdated and no longer supports the site
+
+    **Fix:**
+
+    1. Double-check the URL is a valid, publicly accessible video or playlist link.
+    2. Update yt-dlp to the latest release — new site changes are patched frequently:
+       ```bash
+       python -m pip install -U yt-dlp
+       ```
+    3. Check whether the site is supported by yt-dlp by consulting the [yt-dlp supported sites list](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
+    4. If the content is geo-restricted, consider using a VPN or a yt-dlp cookies argument passed via the command line outside of OSGUI.
+  </Accordion>
+
+  <Accordion title='"No Data Found — Make sure you entered the correct url!"'>
+    **Cause:** yt-dlp returned data successfully, but the JSON output contained neither a `formats` key (single video) nor an `entries` key (playlist). This typically happens when the URL points to a channel page, a search results page, or another non-video, non-playlist resource that yt-dlp cannot map to downloadable content.
+
+    **Fix:**
+
+    - Use a direct video URL (e.g., a specific watch link) or a playlist URL.
+    - Avoid pasting channel home pages, search result URLs, or profile pages.
+    - If you intend to download a playlist, make sure the URL includes the playlist ID parameter.
+  </Accordion>
+
+  <Accordion title='Download shows "Error occurred!" and fails immediately'>
+    **Cause:** yt-dlp wrote to stderr during the download, which OSGUI treats as an error condition. The most common underlying causes are:
+
+    - ffmpeg is not installed or not on `PATH` — required for merging separate video and audio streams
+    - The selected format is not available for the given URL
+    - The content is geo-restricted or has been removed since the metadata was fetched
+
+    **Fix:**
+
+    1. Install ffmpeg and confirm all three binaries are accessible:
+       ```bash
+       ffmpeg -version
+       ffplay -version
+       ffprobe -version
+       ```
+    2. Try selecting a different format from the format picker before downloading.
+    3. Re-fetch the video metadata to get an up-to-date format list, then attempt the download again.
+    4. If the video was recently removed or made private, no workaround is available.
+  </Accordion>
+
+  <Accordion title='"SQL Error" toast'>
+    **Cause:** OSGUI failed to initialize or access the local SQLite database (`osgui.db`) on startup. This is typically caused by a file permissions issue in the app's data directory or a corrupted database file from a previous crash.
+
+    **Fix:**
+
+    1. Ensure the application has write permissions to its data directory. On most systems this is within your user profile folder; no elevated privileges should be required.
+    2. If the database file has become corrupted, try deleting `osgui.db` from the app's data directory to allow OSGUI to recreate it on next launch. Note that this will clear your download history.
+    3. If the issue persists, reinstall OSGUI.
+  </Accordion>
+
+  <Accordion title='"Application Version fetching Error!"'>
+    **Cause:** OSGUI was unable to fetch its own version metadata from the remote update endpoint. This is always a network-related failure — the request to `https://raw.githubusercontent.com/AhmedTrooper/OSGUI/main/update/metadata.json` did not succeed.
+
+    **Workaround:** This error is non-critical. The app continues to function normally without update checking. If you see this toast, verify your internet connection. OSGUI does not require network access for downloading content — only for version checks on startup.
+  </Accordion>
+
+  <Accordion title='Paste button shows "Paste failed" toast'>
+    **Cause:** OSGUI attempted to read the system clipboard and either the clipboard was empty or the operating system denied clipboard access to the application.
+
+    **Fix:**
+
+    1. Ensure you have actually copied a URL to the clipboard before pressing the paste button.
+    2. On some Linux desktop environments, clipboard access requires the application to be in focus. Click the OSGUI window first, then paste.
+    3. If your OS or security software restricts clipboard access for non-focused or sandboxed applications, grant the necessary permissions or type the URL manually into the input field.
+  </Accordion>
+</AccordionGroup>

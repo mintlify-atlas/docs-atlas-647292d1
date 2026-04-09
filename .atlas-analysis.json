@@ -1,0 +1,81 @@
+{
+  "projectType": "saas",
+  "projectName": "OSGUI",
+  "projectDescription": "A lightweight cross-platform desktop GUI for yt-dlp that lets you download videos from YouTube, Facebook, X, and 1000+ other sites with support for playlists, format selection, and real-time progress tracking.",
+  "theme": "almond",
+  "primaryColor": "#f4f4f4",
+  "lightColor": "#040404",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "installation", "quickstart"]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/downloading-videos",
+              "features/playlist-downloads",
+              "features/format-selection",
+              "features/pause-resume"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/dependencies",
+              "configuration/settings",
+              "configuration/theme"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/state-management",
+              "architecture/database"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/faq"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Single and playlist video downloads from YouTube, Facebook, X, and 1000+ sites",
+    "Format and quality selection for both video and audio streams",
+    "Reliable pause/resume via stream-interception architecture (zero zombie processes)",
+    "Real-time download progress tracked via SQLite and Zustand",
+    "Cross-platform support: Windows, macOS, Linux",
+    "Dark/light theme toggle with persistent preferences",
+    "Clipboard integration for quick URL pasting",
+    "Automatic yt-dlp and app version update checks"
+  ],
+  "publicApiSurface": [
+    "useDownloadStore.downloadHandler(formatString, videoUrl, videoTitle, directURL)",
+    "useDownloadStore.videoStreamSelect(vst: string)",
+    "useDownloadStore.audioStreamSelect(ast: string)",
+    "useUserInputVideoStore.fetchVideoInformation()",
+    "useUserInputVideoStore.clipboardReadingHandle()",
+    "useHeavyPlaylistStore.fetchHeavyPlaylistInformation()",
+    "useHeavyPlaylistStore.lightPlaylistBatchDownload(fileArray, playlistTitle, fileFormat)",
+    "useHeavyPlaylistStore.lightPlaylistSingleDownloadHandler(fileTitle, fileUrl, playlistTitle, fileFormat)",
+    "useDatabaseStore.createOrLoadDatabase()",
+    "useDatabaseStore.emptyDatabase()",
+    "useDatabaseStore.singleFileRemove(uniqueId)",
+    "useApplicationstore.fetchAppVersion()",
+    "useApplicationstore.fetchYtdlpVersion()",
+    "useOsInfoStore.detectMobileOS()",
+    "useThemeStore.toggleDark()"
+  ]
+}

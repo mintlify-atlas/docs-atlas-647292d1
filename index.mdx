@@ -1,97 +1,70 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "OSGUI — Desktop Video Downloader"
+description: "A lightweight cross-platform desktop GUI for yt-dlp. Download videos from YouTube, Facebook, X, and 1000+ sites with format selection, playlist support, and reliable pause/resume."
 ---
 
-## Setting up
+OSGUI is a modern desktop application built on [Tauri v2](https://tauri.app/) that gives you a clean, native UI for `yt-dlp`. Download individual videos or entire playlists, pick your preferred format and quality, and track progress in real time — all without touching the command line.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install OSGUI and its required dependencies on Windows, macOS, or Linux.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Download your first video in under two minutes.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Playlist Downloads" icon="list" href="/features/playlist-downloads">
+    Fetch and selectively download entire playlists with batch controls.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Format Selection" icon="sliders" href="/features/format-selection">
+    Choose exact video and audio streams before you download.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What you can do with OSGUI
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Download videos" icon="video" href="/features/downloading-videos">
+    Paste a URL and download from YouTube, Facebook, X, and 1000+ supported sites.
+  </Card>
+  <Card title="Pause and resume" icon="circle-pause" href="/features/pause-resume">
+    Pause active downloads and resume them later with zero data loss.
+  </Card>
+  <Card title="Track progress" icon="chart-line" href="/features/downloading-videos">
+    Real-time status and progress messages for every active download.
+  </Card>
+  <Card title="Manage history" icon="clock-rotate-left" href="/architecture/database">
+    All downloads are persisted in a local SQLite database across sessions.
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Get started in three steps
 
-## Need inspiration?
+<Steps>
+  <Step title="Install dependencies">
+    Make sure `yt-dlp` and `ffmpeg` are installed and available on your system `PATH`. See the [dependencies guide](/configuration/dependencies) for platform-specific instructions.
+  </Step>
+  <Step title="Download and launch OSGUI">
+    Grab the latest release for your platform from the [GitHub releases page](https://github.com/Ahmedtrooper/osgui/releases) and run the installer. See the full [installation guide](/installation) for details.
+  </Step>
+  <Step title="Paste a URL and download">
+    Open OSGUI, paste a video or playlist URL into the input field, click **Search**, select your format, and start downloading. Follow the [quickstart](/quickstart) for a complete walkthrough.
+  </Step>
+</Steps>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Supported platforms
+
+<CardGroup cols={3}>
+  <Card title="Windows" icon="windows">
+    Windows 10 and later (x64)
+  </Card>
+  <Card title="macOS" icon="apple">
+    macOS 11 Big Sur and later
+  </Card>
+  <Card title="Linux" icon="linux">
+    Most major distributions (x64, ARM)
+  </Card>
+</CardGroup>
+
+<Note>
+  OSGUI requires `yt-dlp` and `ffmpeg` to be installed separately. The application will show a warning toast on startup if either binary is missing or outdated.
+</Note>

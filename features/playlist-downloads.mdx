@@ -1,0 +1,86 @@
+---
+title: "Playlist Downloads"
+description: "Fetch playlist metadata and selectively download videos in batch"
+---
+
+OSGUI can fetch an entire playlist's metadata, display all entries, and let you pick individual videos to download in a single batch operation.
+
+## Playlist workflow
+
+<Steps>
+  <Step title="Enable playlist mode">
+    Toggle the **Playlist** switch in the input section before searching. This sets `downloadPlaylist: true` in `UserInputVideoStore`.
+  </Step>
+  <Step title="Enter a playlist URL">
+    Paste or type the playlist URL into the input field, then click **Search**.
+  </Step>
+  <Step title="Fetch playlist metadata">
+    OSGUI runs the following command to retrieve flat playlist metadata without downloading any video:
+
+    ```bash
+    yt-dlp --flat-playlist --dump-single-json --yes-playlist --no-warnings --ignore-errors <url>
+    ```
+
+    The `--flat-playlist` flag tells yt-dlp to list entries without resolving each video's full metadata. `--dump-single-json` outputs the entire playlist as a single JSON object.
+  </Step>
+  <Step title="Metadata is saved locally">
+    The JSON output is written to `~/Documents/OSGUI/playlist.json`. OSGUI then reads this file and populates `heavyPlaylistInformation` and `lightEntriesArr` in `HeavyPlaylistStore`.
+  </Step>
+  <Step title="Browse playlist entries">
+    The playlist section becomes visible, showing all entries from the fetched metadata. Each entry displays its title and URL.
+  </Step>
+  <Step title="Download individual entries or select for batch">
+    Each playlist entry shows a row of quality buttons for direct download:
+
+    - **Best Q.** — `bestvideo+bestaudio`
+    - **Max-4K/2160p** — `bestvideo[height<=2160]+bestaudio`
+    - **Max-2K/1440p** — `bestvideo[height<=1440]+bestaudio`
+    - **Max-FHD/1080p** — `bestvideo[height<=1080]+bestaudio`
+    - **Max-HD/720** — `bestvideo[height<=720]+bestaudio`
+    - **Audio (Max-best)** — `bestaudio`
+
+    Clicking any quality button immediately starts that entry's download. Alternatively, click **Select** on an entry to add it to the **Selected Videos** list for batch downloading.
+  </Step>
+  <Step title="Batch download selected or complete playlist">
+    Once you have selected videos, the **Selected Videos** section appears with quality buttons to batch-download only your picks. The **Complete Playlist** section lets you download every entry in the playlist at once in your chosen quality.
+
+    OSGUI calls `lightPlaylistBatchDownload`, which dispatches one `lightPlaylistSingleDownloadHandler` per entry concurrently using `Promise.all`. Each video is downloaded with:
+
+    ```bash
+    yt-dlp -f <quality> -o ~/Downloads/OSGUI/<playlistTitle>/%(title)s<quality>.%(ext)s <videoUrl>
+    ```
+
+    Files are organized into a subfolder named after the playlist title.
+  </Step>
+</Steps>
+
+## Output location
+
+Playlist downloads are saved to:
+
+```
+~/Downloads/OSGUI/<playlistTitle>/%(title)s<quality>.%(ext)s
+```
+
+The `<playlistTitle>` folder is created automatically if it does not exist. Each video file is named using its yt-dlp title followed by the quality identifier and the file extension.
+
+## Quality options
+
+Quality is selected from the `LightPlaylistVideoQuality` enum values, which are passed directly as the `-f` argument to yt-dlp. Available options:
+
+| Button label | yt-dlp format string |
+|---|---|
+| Best Q. | `bestvideo+bestaudio` |
+| Max-4K/2160p | `bestvideo[height<=2160]+bestaudio` |
+| Max-2K/1440p | `bestvideo[height<=1440]+bestaudio` |
+| Max-FHD/1080p | `bestvideo[height<=1080]+bestaudio` |
+| Max-HD/720 | `bestvideo[height<=720]+bestaudio` |
+| Audio (Max-best) | `bestaudio` |
+
+<Tip>
+  You do not need to select entries before downloading. Use the per-entry quality buttons to start individual downloads immediately, or use **Select** to build a custom batch. Deduplication by URL ensures the same video is never queued twice in the same session.
+</Tip>
+
+## Playlist metadata cache
+
+The fetched metadata is cached at `~/Documents/OSGUI/playlist.json`. Each new search overwrites this file. The cache is used only to populate the UI — it is not consulted during the download step.

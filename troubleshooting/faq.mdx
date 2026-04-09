@@ -1,0 +1,74 @@
+---
+title: "FAQ"
+description: "Frequently asked questions about OSGUI"
+---
+
+<AccordionGroup>
+  <Accordion title="Which sites does OSGUI support?">
+    OSGUI supports any site that yt-dlp supports — over 1,000 sites including YouTube, Facebook, X (Twitter), Instagram, TikTok, Vimeo, and many more. OSGUI itself imposes no site restrictions; compatibility is determined entirely by your installed version of yt-dlp.
+
+    Consult the [yt-dlp supported sites list](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) for the full directory.
+  </Accordion>
+
+  <Accordion title="Where are downloaded files saved?">
+    - **Individual videos** are saved to `~/Downloads/OSGUI/`.
+    - **Playlist items** are saved to `~/Downloads/OSGUI/<PlaylistTitle>/`.
+
+    The output path is not currently configurable through the OSGUI interface.
+  </Accordion>
+
+  <Accordion title="Why does OSGUI need yt-dlp and ffmpeg separately?">
+    OSGUI is a GUI frontend, not a standalone downloader. It delegates all downloading and media processing to external tools:
+
+    - **yt-dlp** fetches video metadata and downloads content from supported sites.
+    - **ffmpeg** (along with `ffplay` and `ffprobe`) merges separate video and audio streams, handles format conversion, and performs audio extraction.
+
+    Both must be installed and available on your system `PATH`. OSGUI will not function correctly if either is missing.
+  </Accordion>
+
+  <Accordion title="Does OSGUI support resuming interrupted downloads?">
+    OSGUI can pause a running download cleanly. It uses a stream interception approach — when a pause is requested, the active download process terminates itself from within its own data stream handler, avoiding zombie processes.
+
+    However, resuming means restarting the download from the beginning. yt-dlp does not support partial resume by default without additional flags and configuration that are not currently exposed in the OSGUI interface.
+  </Accordion>
+
+  <Accordion title="Is my data stored anywhere?">
+    - **Download history** is stored in a local SQLite database file (`osgui.db`) on your machine. No download data leaves your device.
+    - **Anonymous usage analytics** — including OS platform, architecture, and app version — are sent to a Supabase backend on first launch to help improve the product. No personal data, usernames, or download URLs are included in this payload.
+  </Accordion>
+
+  <Accordion title="Why must yt-dlp be named exactly `yt-dlp` (or `yt-dlp.exe` on Windows)?">
+    OSGUI uses Tauri's shell plugin to invoke the binary. Internally, it calls a registered command named `ytDlp`, which Tauri maps to the executable name `yt-dlp`. The shell plugin looks up this exact name on your system `PATH`.
+
+    Alternative binary names such as `ytdlp`, `yt_dlp`, or `ytdlpx64` will not be resolved. You must rename the binary to `yt-dlp` (or `yt-dlp.exe` on Windows) for OSGUI to find it.
+  </Accordion>
+
+  <Accordion title="How do I update yt-dlp?">
+    If you installed yt-dlp via pip:
+
+    ```bash
+    python -m pip install -U yt-dlp
+    ```
+
+    If you use a standalone binary, download the latest release from the [yt-dlp releases page](https://github.com/yt-dlp/yt-dlp/releases) and replace the existing binary.
+
+    OSGUI displays a warning toast on startup if your installed version is behind the latest known release.
+  </Accordion>
+
+  <Accordion title="How do I update OSGUI itself?">
+    On startup, OSGUI compares your local app version against the metadata file at `https://raw.githubusercontent.com/AhmedTrooper/OSGUI/main/update/metadata.json`. If a newer version is available, a warning toast appears.
+
+    To update, download the latest release from the [OSGUI releases page](https://github.com/Ahmedtrooper/osgui/releases) and install it over the existing version.
+  </Accordion>
+
+  <Accordion title="Can I use OSGUI on mobile (Android/iOS)?">
+    No. OSGUI is a desktop application for Windows, macOS, and Linux. The app detects mobile platforms at runtime and treats them as unsupported environments.
+  </Accordion>
+
+  <Accordion title="How do I clear my download history?">
+    - To clear all history, use the clear button in the downloads panel. This empties the `DownloadList` table in the local SQLite database.
+    - To remove a single entry, use the remove button on that specific download item in the list.
+
+    Both actions are permanent and cannot be undone.
+  </Accordion>
+</AccordionGroup>

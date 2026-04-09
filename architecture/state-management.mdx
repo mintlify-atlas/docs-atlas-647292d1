@@ -1,0 +1,191 @@
+---
+title: "State Management"
+description: "Zustand stores: domains, responsibilities, and data flow"
+---
+
+OSGUI uses [Zustand](https://github.com/pmndrs/zustand) for all client-side state. Each store owns exactly one domain. React components never call Tauri APIs directly — they call store actions, which encapsulate all side effects.
+
+<Note>
+High-frequency I/O from yt-dlp (100+ stdout chunks per second during ffmpeg merging) is decoupled from the React render cycle by the polling interval. The SQLite database absorbs all writes at full stream rate; the UI only re-renders on each `setInterval` tick (default every 1000 ms), preventing render thrashing and dropped frames.
+</Note>
+
+## Stores
+
+<AccordionGroup>
+  <Accordion title="UserInputVideoStore — user input and video metadata">
+    **File:** `src/store/UserInputVideoStore.ts`
+
+    The primary store for the single-video workflow. Manages the URL field, metadata fetching, and the shared download list array that all components read from.
+
+    **State**
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `videoUrl` | `string` | The URL entered by the user in the input field |
+    | `downloadPlaylist` | `boolean` | When `true`, uses `--flat-playlist --dump-single-json`; when `false`, uses `--dump-json` |
+    | `showNonMedia` | `boolean` | Toggles display of non-media format options in the format selector |
+    | `videoInformation` | `VideoInformationInterface \| null` | Fetched video metadata including available formats |
+    | `downloadsArr` | `DownloadListInterface[]` | Current download list, hydrated from SQLite and updated by `DatabaseStore` and `DownloadStore` |
+    | `isLoadingForJsonCreation` | `boolean` | `true` while yt-dlp is running to fetch metadata |
+    | `videoInformationFetchFailed` | `boolean` | Set to `true` when metadata fetch encounters an error |
+    | `videoToPause` | `string \| null` | The `unique_id` of the download to pause; read inside `dataHandler` on every stdout chunk |
+
+    **Actions**
+
+    - `fetchVideoInformation()`: Spawns `yt-dlp --dump-json <url>` (single video) or `yt-dlp --flat-playlist --dump-single-json <url>` (playlist mode). On close, writes output to `video.json` via `@tauri-apps/plugin-fs`, then calls `readJsonFile()`.
+    - `readJsonFile()`: Reads `~/Documents/OSGUI/video.json`, parses JSON, and routes to either `setVideoInformation()` (single video with `formats` array) or `HeavyPlaylistStore.setHeavyPlaylistInformation()` (playlist with `entries` array).
+    - `clipboardReadingHandle()`: Reads from clipboard via `@tauri-apps/plugin-clipboard-manager` and sets `videoUrl`.
+    - `clipboardWritingHandle(data)`: Writes a URL string to the clipboard.
+    - `setDownloadsArr(arr)`: Replaces the download list; called by `DatabaseStore` on startup and `DownloadStore` after every DB write.
+  </Accordion>
+
+  <Accordion title="DownloadStore — download execution">
+    **File:** `src/store/DownloadStore.ts`
+
+    Owns the download lifecycle: spawning yt-dlp, streaming stdout, writing to SQLite, and implementing the stream-interception pause mechanism.
+
+    **State**
+
+    | Field | Type | Default | Description |
+    |---|---|---|---|
+    | `selectedFormat` | `string \| null` | `null` | Combined yt-dlp format string, e.g., `137+140` |
+    | `selectedVideoStream` | `string \| null` | `null` | The video-only stream ID selected by the user |
+    | `selectedAudioStream` | `string \| null` | `null` | The audio-only stream ID selected by the user |
+    | `defaultTimeInterval` | `number` | `1000` | DB polling interval in milliseconds; persisted to `localStorage` |
+
+    **Actions**
+
+    - `downloadHandler(formatString, videoUrl, videoTitle, directURL)`: The core download action. Spawns yt-dlp, INSERTs a new `DownloadList` row, starts a `setInterval` poll, attaches `dataHandler` to stdout, and registers `on("close")` to finalize state.
+    - `videoStreamSelect(vst)`: Sets `selectedVideoStream` and recombines with `selectedAudioStream` into `selectedFormat` (e.g., `"137+140"`).
+    - `audioStreamSelect(ast)`: Sets `selectedAudioStream` and recombines with `selectedVideoStream` into `selectedFormat`.
+    - `setDefaultTimeInterval(interval)`: Updates polling interval and persists it to `localStorage`.
+
+    **Pause mechanism**
+
+    Inside `dataHandler`, after every DB write, the handler calls `useUserInputVideoStore.getState().videoToPause`. If the returned ID matches the current download's `uniqueId`, the handler:
+    1. Sets `isPaused = true`
+    2. UPDATEs `DownloadList` with `active = false, isPaused = true`
+    3. Calls `childDataProcess.kill()`
+
+    This self-termination from within the stream closure is what prevents zombie processes.
+  </Accordion>
+
+  <Accordion title="DatabaseStore — SQLite management">
+    **File:** `src/store/DatabaseStore.ts`
+
+    Owns the SQLite schema and bulk database operations. Uses `@tauri-apps/plugin-sql` to interact with `osgui.db`.
+
+    **State**
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `databaseLoaded` | `boolean` | Set to `true` after `createOrLoadDatabase()` completes |
+
+    **Actions**
+
+    - `createOrLoadDatabase()`: Runs `CREATE TABLE IF NOT EXISTS DownloadList (...)`, then `SELECT * FROM DownloadList` to hydrate `UserInputVideoStore.downloadsArr`. Called once on app startup from `App.tsx`.
+    - `emptyDatabase()`: Runs `DELETE FROM DownloadList` and resets `downloadsArr` to `[]`.
+    - `singleFileRemove(uniqueId)`: Runs `DELETE FROM DownloadList WHERE unique_id = $1` and refreshes `downloadsArr`.
+    - `supabaseQueryInsert()`: Collects anonymous telemetry (platform, arch, locale, app version, Tauri version) via `@tauri-apps/plugin-os` and `@tauri-apps/api/app`, then inserts a row into a remote Supabase `UniversalApplicationUsages` table. This is isolated from the core application loop so network latency cannot affect downloads.
+  </Accordion>
+
+  <Accordion title="HeavyPlaylistStore — playlist operations">
+    **File:** `src/store/HeavyPlaylistStore.ts`
+
+    Manages the playlist workflow: fetching flat playlist metadata, letting users select a subset of entries, and running parallel batch downloads.
+
+    **State**
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `playlistUrl` | `string` | The playlist URL entered by the user |
+    | `playlistFetchFailed` | `boolean` | Error flag for playlist metadata fetch |
+    | `playlistFetchLoading` | `boolean` | Loading flag during yt-dlp metadata fetch |
+    | `heavyPlaylistInformation` | `HeavyPlaylistInformationInterface \| null` | Full parsed playlist JSON |
+    | `lightEntriesArr` | `LightPlaylistEntry[]` | Flat list of all entries in the playlist |
+    | `modifiedLightEntriesArr` | `LightPlaylistEntry[] \| null` | User-selected subset for batch download |
+
+    **Actions**
+
+    - `fetchHeavyPlaylistInformation()`: Spawns `yt-dlp --flat-playlist --dump-single-json --yes-playlist --no-warnings --ignore-errors <url>`. On close, writes to `~/Documents/OSGUI/playlist.json` and calls `readHeavyPlaylistJsonFile()`.
+    - `readHeavyPlaylistJsonFile()`: Reads `playlist.json`, parses JSON, sets `heavyPlaylistInformation` and `lightEntriesArr`.
+    - `addItemsToLightModifiedEntriesArr(item)` / `removeItemsFromLightModifiedEntriesArr(item)`: Manage the user-selected subset, deduplicating by `entry.url`.
+    - `lightPlaylistBatchDownload(fileArray, playlistTitle, fileFormat)`: Calls `Promise.all()` over `fileArray`, dispatching one `lightPlaylistSingleDownloadHandler()` per entry for parallel downloads.
+    - `lightPlaylistSingleDownloadHandler(fileTitle, fileUrl, playlistTitle, fileFormat)`: Same stream-interception pattern as `DownloadStore.downloadHandler`, but writes files to `~/Downloads/OSGUI/<playlistTitle>/` and includes `playlistVerification` and `playlistTitle` in the DB row.
+  </Accordion>
+
+  <Accordion title="ApplicationStore — app and yt-dlp version management">
+    **File:** `src/store/ApplicationStore.ts`
+
+    Checks local vs. remote versions of both the OSGUI app and the yt-dlp binary, and surfaces update notifications via HeroUI toasts.
+
+    **State**
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `appVersion` | `string \| null` | Local OSGUI version from `@tauri-apps/api/app` `getVersion()` |
+    | `onlineApplicationVersion` | `string \| null` | Remote OSGUI version from `metadata.json` |
+    | `isApplicationUpdateAvailable` | `boolean` | `true` when `localVersion < onlineVersion` |
+    | `ytDlpVersion` | `string \| null` | Local yt-dlp version from `yt-dlp --version` |
+    | `onlineYtdlpVersion` | `string \| null` | Remote yt-dlp version from `metadata.json` |
+    | `isYtdlpUpdateAvailable` | `boolean` | `true` when local yt-dlp is outdated |
+    | `metadataUrl` | `string` | URL of the remote `metadata.json` file on GitHub |
+
+    **Actions**
+
+    - `fetchAppVersion()`: Calls `getVersion()`, fetches `metadata.json`, compares versions, and then chains into `fetchYtdlpVersion()`.
+    - `fetchYtdlpVersion()`: Runs `Command.create("ytDlp", ["--version"]).execute()`, fetches `metadata.json`, and compares versions. If yt-dlp is missing from `PATH`, surfaces a toast instead of crashing.
+  </Accordion>
+
+  <Accordion title="OsInfoStore — platform detection">
+    **File:** `src/store/OsInfoStore.ts`
+
+    Lightweight store that detects the host platform at runtime via `@tauri-apps/plugin-os`.
+
+    **State**
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `osName` | `string \| null` | The platform string returned by `platform()` (e.g., `"linux"`, `"windows"`, `"macos"`) |
+    | `isMobileOS` | `boolean` | `true` if `osName` is `"android"` or `"ios"` |
+
+    **Actions**
+
+    - `detectMobileOS()`: Calls `platform()` from `@tauri-apps/plugin-os`, stores the result in `osName`, and sets `isMobileOS` accordingly. Used by `App.tsx` on startup to conditionally render mobile-specific UI elements.
+  </Accordion>
+
+  <Accordion title="ThemeStore — UI theme">
+    **File:** `src/store/ThemeStore.ts`
+
+    Manages the application color scheme with persistence to `localStorage`.
+
+    **State**
+
+    | Field | Type | Default | Description |
+    |---|---|---|---|
+    | `dark` | `boolean` | `true` | When `true`, the HeroUI dark theme class is applied |
+    | `savedTheme` | `"dark" \| "light" \| null` | From `localStorage` | The last persisted theme preference |
+
+    **Actions**
+
+    - `toggleDark()`: Flips `dark` between `true` and `false`.
+    - `setThemeData()`: On app startup, reads `savedTheme` from `localStorage` and calls `setDark()` accordingly. Falls back to `"dark"` if no preference is saved.
+  </Accordion>
+
+  <Accordion title="UtilityStore — shared utilities">
+    **File:** `src/store/UtilityStore.ts`
+
+    A minimal store providing shared utility functions used across components. It has no persistent state.
+
+    **Actions**
+
+    - `parseBoolean(value)`: Normalizes SQLite boolean values — which can be returned as `true`, `false`, `0`, `1`, `"0"`, `"1"`, `"true"`, or `"false"` — into a reliable JavaScript `boolean`. Used throughout `DownloadSection` to safely render status icons.
+  </Accordion>
+</AccordionGroup>
+
+## Store Inter-dependencies
+
+Stores are intentionally decoupled, but two cross-store dependencies exist:
+
+- **`DownloadStore` → `UserInputVideoStore`**: After every DB write, `DownloadStore` calls `useUserInputVideoStore.getState().setDownloadsArr(...)` to push the latest rows into shared UI state.
+- **`DatabaseStore` → `UserInputVideoStore`**: On startup, `createOrLoadDatabase()` reads the existing `DownloadList` and hydrates `downloadsArr` via `setDownloadsArr`.
